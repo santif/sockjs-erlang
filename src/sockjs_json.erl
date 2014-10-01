@@ -6,9 +6,8 @@
 
 -spec encode(any()) -> iodata().
 encode(Thing) ->
-    {ok, Json} = json:encode(Thing),
-    Json.
+    jiffy:encode(Thing).
 
 -spec decode(iodata()) -> {ok, any()} | {error, any()}.
 decode(Encoded) ->
-    json:decode(Encoded).
+    jiffy:decode(Encoded).
