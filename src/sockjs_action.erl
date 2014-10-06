@@ -71,11 +71,11 @@ iframe(Req, Headers, #service{sockjs_url = SockjsUrl}) ->
 -spec info_test(req(), headers(), service()) -> req().
 info_test(Req, Headers, #service{websocket = Websocket,
                                  cookie_needed = CookieNeeded}) ->
-    I = [{websocket, Websocket},
-         {cookie_needed, CookieNeeded},
-         {origins, [<<"*:*">>]},
-         {entropy, sockjs_util:rand32()}],
-    D = sockjs_json:encode({I}),
+    I = #{websocket => Websocket,
+          cookie_needed => CookieNeeded,
+          origins => [<<"*:*">>],
+          entropy => sockjs_util:rand32()},
+    D = sockjs_json:encode(I),
     H = [{"Content-Type", "application/json; charset=UTF-8"}],
     sockjs_http:reply(200, H ++ Headers, D, Req).
 
@@ -241,7 +241,7 @@ fmt_xhr(Body) -> [Body, "\n"].
 
 -spec fmt_eventsource(iodata()) -> iodata().
 fmt_eventsource(Body) ->
-    Escaped = sockjs_util:url_escape(binary_to_list(iolist_to_binary(Body)),
+    Escaped = sockjs_util:url_escape(iolist_to_binary(Body),
                                      "%\r\n\0"), %% $% must be first!
     [<<"data: ">>, Escaped, <<"\r\n\r\n">>].
 

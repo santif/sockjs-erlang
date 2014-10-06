@@ -15,7 +15,7 @@ received(websocket, SessionPid, Data) ->
         Message when is_binary(Message) ->
             session_received([Message], SessionPid);
         Messages when is_list(Messages) ->
-            session_received(Messages, SessionPid);
+            session_received(Messages, SessionPid)
     end;
 
 received(rawwebsocket, SessionPid, Data) ->

@@ -34,15 +34,13 @@ encode_frame({heartbeat, nil}) ->
     <<"h">>.
 
 
--spec url_escape(string(), string()) -> iolist().
+-spec url_escape(binary(), [char()]) -> iolist().
 url_escape(Str, Chars) ->
     [case lists:member(Char, Chars) of
          true  -> hex(Char);
          false -> Char
-     end || Char <- Str].
+     end || <<Char>> <- Str].
 
 hex(C) ->
-    <<High0:4, Low0:4>> = <<C>>,
-    High = integer_to_list(High0),
-    Low = integer_to_list(Low0),
-    "%" ++ High ++ Low.
+    <<High:4, Low:4>> = <<C>>,
+    [$%, High + 48, Low + 48].
