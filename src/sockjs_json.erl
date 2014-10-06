@@ -6,8 +6,8 @@
 
 -spec encode(any()) -> iodata().
 encode(Thing) ->
-    jiffy:encode(Thing).
+    'Elixir.Poison':'encode!'(Thing, [{iodata, true}]).
 
--spec decode(iodata()) -> {ok, any()} | {error, any()}.
+-spec decode(iodata()) -> any().
 decode(Encoded) ->
-    jiffy:decode(Encoded).
+    'Elixir.Poison':'decode!'(Encoded).

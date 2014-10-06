@@ -247,7 +247,7 @@ fmt_eventsource(Body) ->
 
 -spec fmt_htmlfile(iodata()) -> iodata().
 fmt_htmlfile(Body) ->
-    Double = sockjs_json:encode(iolist_to_binary(Body)),
+    Double = sockjs_json:encode(Body),
     [<<"<script>\np(">>, Double, <<");\n</script>\r\n">>].
 
 -spec fmt_jsonp(iodata(), iodata()) -> iodata().
@@ -255,7 +255,7 @@ fmt_jsonp(Body, Callback) ->
     %% Yes, JSONed twice, there isn't a a better way, we must pass
     %% a string back, and the script, will be evaled() by the
     %% browser.
-    [Callback, "(", sockjs_json:encode(iolist_to_binary(Body)), ");\r\n"].
+    [Callback, "(", sockjs_json:encode(Body), ");\r\n"].
 
 %% --------------------------------------------------------------------------
 
