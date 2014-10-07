@@ -121,8 +121,8 @@ mark_waiting(Pid, State = #session{response_pid    = undefined,
                                    heartbeat_delay = HeartbeatDelay})
   when DisconnectTRef =/= undefined ->
     link(Pid),
-    cancel_timer_safe(DisconnectTRef, session_timeout),
-    TRef = erlang:send_after(HeartbeatDelay, self(), heartbeat_triggered),
+    cancel_timer_safe(DisconnectTRef, {'$sockjs_session$', session_timeout}),
+    TRef = erlang:send_after(HeartbeatDelay, self(), {'$sockjs_session$', heartbeat_triggered}),
     State#session{response_pid    = Pid,
                   disconnect_tref = undefined,
                   heartbeat_tref  = TRef}.
@@ -137,9 +137,9 @@ unmark_waiting(RPid, State = #session{response_pid     = RPid,
     _ = case HeartbeatTRef of
             undefined -> ok;
             triggered -> ok;
-            _Else     -> cancel_timer_safe(HeartbeatTRef, heartbeat_triggered)
+            _Else     -> cancel_timer_safe(HeartbeatTRef, {'$sockjs_session$', heartbeat_triggered})
         end,
-    TRef = erlang:send_after(DisconnectDelay, self(), session_timeout),
+    TRef = erlang:send_after(DisconnectDelay, self(), {'$sockjs_session$', session_timeout}),
     State#session{response_pid    = undefined,
                   heartbeat_tref  = undefined,
                   disconnect_tref = TRef};
@@ -149,8 +149,8 @@ unmark_waiting(_Pid, State = #session{response_pid     = undefined,
                                       disconnect_tref  = DisconnectTRef,
                                       disconnect_delay = DisconnectDelay})
   when DisconnectTRef =/= undefined ->
-    cancel_timer_safe(DisconnectTRef, session_timeout),
-    TRef = erlang:send_after(DisconnectDelay, self(), session_timeout),
+    cancel_timer_safe(DisconnectTRef, {'$sockjs_session$', session_timeout}),
+    TRef = erlang:send_after(DisconnectDelay, self(), {'$sockjs_session$', session_timeout}),
     State#session{disconnect_tref = TRef};
 
 %% 3) Event from someone else? Ignore.
@@ -170,6 +170,7 @@ emit(What, State = #session{callback = Callback,
                 case What of
                     init         -> Callback:sockjs_init(Handle, UserState);
                     {recv, Data} -> Callback:sockjs_handle(Handle, Data, UserState);
+                    {info, Data} -> Callback:sockjs_info(Handle, Data, UserState);
                     closed       -> Callback:sockjs_terminate(Handle, UserState)
                 end
         end,
@@ -190,7 +191,7 @@ init({SessionId, #service{callback         = Callback,
         _Else     -> ets:insert(?ETS, {SessionId, self()})
     end,
     process_flag(trap_exit, true),
-    TRef = erlang:send_after(DisconnectDelay, self(), session_timeout),
+    TRef = erlang:send_after(DisconnectDelay, self(), {'$sockjs_session$', session_timeout}),
     {ok, #session{id               = SessionId,
                   callback         = Callback,
                   state            = UserState,
@@ -286,19 +287,20 @@ handle_info({'EXIT', Pid, _Reason},
     %% session.
     {stop, normal, State#session{response_pid = undefined}};
 
-handle_info(force_shutdown, State) ->
+handle_info({'$sockjs_session$', force_shutdown}, State) ->
     %% Websockets may want to force closure sometimes
     {stop, normal, State};
 
-handle_info(session_timeout, State = #session{response_pid = undefined}) ->
+handle_info({'$sockjs_session$', session_timeout}, State = #session{response_pid = undefined}) ->
     {stop, normal, State};
 
-handle_info(heartbeat_triggered, State = #session{response_pid = RPid}) when RPid =/= undefined ->
+handle_info({'$sockjs_session$', heartbeat_triggered}, State = #session{response_pid = RPid}) when RPid =/= undefined ->
     RPid ! go,
     {noreply, State#session{heartbeat_tref = triggered}};
 
 handle_info(Info, State) ->
-    {stop, {odd_info, Info}, State}.
+    emit({info, Info}, State),
+    {noreply, State}.
 
 
 terminate(_, State = #session{id = SessionId}) ->

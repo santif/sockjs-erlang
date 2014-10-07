@@ -52,5 +52,5 @@ reply(rawwebsocket, SessionPid) ->
 
 -spec close(websocket|rawwebsocket, pid()) -> ok.
 close(_RawWebsocket, SessionPid) ->
-    SessionPid ! force_shutdown,
+    SessionPid ! {'$sockjs_session$', force_shutdown},
     ok.
