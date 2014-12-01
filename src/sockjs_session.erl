@@ -211,11 +211,17 @@ handle_call({reply, Pid, _Multiple}, _From, State = #session{
     {reply, {ok, {open, nil}},
      State1#session{ready_state = open}};
 
-handle_call({reply, Pid, _Multiple}, _From, State = #session{
-                                              ready_state = closed,
-                                              close_msg   = CloseMsg}) ->
-    State1 = unmark_waiting(Pid, State),
-    {reply, {close, {close, CloseMsg}}, State1};
+handle_call({reply, Pid, Multiple}, _From, State = #session{
+                                              ready_state    = closed,
+                                              close_msg      = CloseMsg,
+                                              outbound_queue = Q}) ->
+    case queue:is_empty(Q) of
+      true ->
+        State1 = unmark_waiting(Pid, State),
+        {reply, {close, {close, CloseMsg}}, State1};
+      false ->
+        reply_frame(Pid, Multiple, State)
+    end;
 
 
 handle_call({reply, Pid, _Multiple}, _From, State = #session{
@@ -225,27 +231,8 @@ handle_call({reply, Pid, _Multiple}, _From, State = #session{
     {reply, session_in_use, State};
 
 handle_call({reply, Pid, Multiple}, _From, State = #session{
-                                             ready_state    = open,
-                                             response_pid   = RPid,
-                                             heartbeat_tref = HeartbeatTRef,
-                                             outbound_queue = Q})
-  when RPid == undefined orelse RPid == Pid ->
-    {Messages, Q1} = case Multiple of
-                         true  -> {queue:to_list(Q), queue:new()};
-                         false -> case queue:out(Q) of
-                                      {{value, Msg}, Q2} -> {[Msg], Q2};
-                                      {empty, Q2}        -> {[], Q2}
-                                  end
-                     end,
-    case {Messages, HeartbeatTRef} of
-        {[], triggered} -> State1 = unmark_waiting(Pid, State),
-                           {reply, {ok, {heartbeat, nil}}, State1};
-        {[], _TRef}     -> State1 = mark_waiting(Pid, State),
-                           {reply, wait, State1};
-        _More           -> State1 = unmark_waiting(Pid, State),
-                           {reply, {ok, {data, Messages}},
-                            State1#session{outbound_queue = Q1}}
-    end;
+                                             ready_state    = open}) ->
+    reply_frame(Pid, Multiple, State);
 
 handle_call({received, Messages}, _From, State = #session{ready_state = open}) ->
     State2 = lists:foldl(fun(Msg, State1) ->
@@ -311,3 +298,23 @@ terminate(_, State = #session{id = SessionId}) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
+reply_frame(Pid, Multiple, State = #session{response_pid   = RPid,
+                                            heartbeat_tref = HeartbeatTRef,
+                                            outbound_queue = Q})
+  when RPid == undefined orelse RPid == Pid ->
+    {Messages, Q1} = case Multiple of
+                         true  -> {queue:to_list(Q), queue:new()};
+                         false -> case queue:out(Q) of
+                                      {{value, Msg}, Q2} -> {[Msg], Q2};
+                                      {empty, Q2}        -> {[], Q2}
+                                  end
+                     end,
+    case {Messages, HeartbeatTRef} of
+        {[], triggered} -> State1 = unmark_waiting(Pid, State),
+                           {reply, {ok, {heartbeat, nil}}, State1};
+        {[], _TRef}     -> State1 = mark_waiting(Pid, State),
+                           {reply, wait, State1};
+        _More           -> State1 = unmark_waiting(Pid, State),
+                           {reply, {ok, {data, Messages}},
+                            State1#session{outbound_queue = Q1}}
+    end.
