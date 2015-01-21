@@ -167,13 +167,12 @@ handle_recv(Req, Body, Session) ->
             {error, sockjs_http:reply(500, [], "Payload expected.", Req)};
         _Any ->
             case sockjs_json:decode(Body) of
-                {ok, Decoded} when is_list(Decoded)->
-                    sockjs_session:received(Decoded, Session),
-                    ok;
-                {error, _} ->
-                    {error, sockjs_http:reply(500, [],
-                                              "Broken JSON encoding.", Req)}
-            end
+                Message when is_binary(Message) ->
+                    sockjs_session:received([Message], Session);
+                Messages when is_list(Messages) ->
+                    sockjs_session:received(Messages, Session)
+            end,
+            ok
     end.
 
 %% --------------------------------------------------------------------------
